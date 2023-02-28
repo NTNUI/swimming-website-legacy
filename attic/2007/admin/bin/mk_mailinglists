@@ -1,0 +1,87 @@
+#!/store/bin/perl -w
+# 
+# Create mailing lists for the 'studorg' svommer.
+#
+# Author (c):   Bård Skaflestad <bardsk@math.ntnu.no>
+# Creation:     2002-04-01
+# Modified:     2002-04-01, Bård Skaflestad <bardsk@math.ntnu.no>
+#
+# @(#)$Id:$
+
+use strict;
+use DBI;
+
+# Config
+my $BASE_DIR = '/home/groups/svommer/public_html/';
+my $EMAIL    = "$BASE_DIR/EMAIL/";
+my $pw_file  = "$BASE_DIR/admin/dbsettings.php";
+my $db_host  = '<REDACTED>';
+
+# Mailing list categories (prepared SQL statements)
+my %lists = {
+        'complete' => \&sth_complete,
+        'private'  => \&sth_private,
+        'public'   => \&sth_public,
+    };
+
+# &connect() die()'s if a connection cannot be established
+my $dbh = &connect();
+
+if (defined $dbh) {
+    &mk_lists($dbh);
+    &disconnect($dbh);
+}
+
+sub connect {
+    # data source (DB)
+
+    my $user   = undef;
+    my $passwd = undef;
+    my $dbh    = undef;
+
+    open(PW, "<$pw_file") or die "Unable to determine DB password: $!";
+
+    while (<PW>) {
+        chomp;
+
+        if (/^.*user="([a-z]+)"/)    { $user   = $1; }
+        elsif (/^.*query="([^"]+)"/) { $passwd = $1; }
+    }
+
+    close(PW) or warn "Unable to close DB password file: $!";
+
+    my $ds = "DBI:mysql:database=${user}_member;host=$db_host";
+    $dbh = DBI->connect($ds, "${user}_query", $passwd, 
+                        {PrintError => 1, AutoCommit => 1});
+
+    return $dbh;
+}
+
+
+sub mk_lists {
+    my $dbh = shift;
+}
+
+
+sub disconnect {
+    my $dbh = shift;
+    $dbh->disconnect or warn "Could not close DB connection: $dbh->errstr";
+}
+
+
+# SQL statement for extracting all email addresses from DB.  Used in
+# creating the 'EMAIL-KOMPLETT' mailinglist
+sub sth_complete {
+    my $dbh = shift;
+    my $sth = $dbh->prepare("select email from PERSON where email" .
+			    " != '' order by email");
+}
+
+
+# SQL statement for extracting members of publicly available
+# mailinglists
+sub sth_public {
+    my $dbh = shift;
+    my $sth = $dbh->prepare("select P.email,E.list from PERSON P" .
+	                    " order by P.email");
+}

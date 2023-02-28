@@ -1,0 +1,25 @@
+#!/bin/sh
+
+. /home/groups/svommer/public_html/admin/bin/Environment
+
+mysql --skip-column-names -ukjerslo_svommer -pM35SiNoki -B -e \
+	"select distinct email from PERSON where email not like ''" \
+	kjerslo_member > EMAIL-KOMPLETT.new
+
+# XXX
+# 2003-10-28, bardsk:
+#   Vi trenger GNU diff(1) for å få u-diff'er (de er mye lettere å lese
+#   enn c-diff'er).
+#
+#   Dessverre må vi (pga. en (midlertidig?) feil i installasjonen av
+#   /store/bin/mysql) ha /usr/bin før /store/{gnu,}/bin i $PATH.
+#
+#   Bruk eksplisitt full referanse til GNU diff som virker på både
+#   login* og solarislogin.  Dette er et hack som bør fjernes når
+#   /store/bin/mysql virker igjen...
+#
+/store/gnu/bin/diff -u EMAIL-KOMPLETT EMAIL-KOMPLETT.new
+
+
+mv EMAIL-KOMPLETT.new EMAIL-KOMPLETT
+chmod g+rw,o+r EMAIL-KOMPLETT

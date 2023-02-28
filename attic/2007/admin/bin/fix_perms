@@ -1,0 +1,28 @@
+#!/bin/sh
+# Script for fiksing av rettigheter under
+#
+#     /home/groups/svommer/public_html/
+
+. /home/groups/svommer/public_html/admin/bin/Environment
+
+base_dir=/home/groups/svommer/public_html/
+
+# Disse katalogene skal /ikke/ behandles trivielt
+no_descend='CONF|EMAIL|SQL|admin|attic'
+
+gnu=/store/gnu/bin/
+ls=$gnu/ls
+grep=$gnu/grep
+chmod=$gnu/chmod
+chgrp=$gnu/chgrp
+
+dirs=`$ls -F $base_dir | $grep '/' | $grep -Ev $no_descend`
+
+# Håndtere trivielle kataloger
+for d in $dirs; do
+    $chgrp -R svommer $base_dir/$d
+    $chmod -R u+rwX,g+rwX,o+rX $base_dir/$d
+done
+
+# Håndtere spesielle kataloger
+$chmod g+s $base_dir/admin/bin/exec_wrapper

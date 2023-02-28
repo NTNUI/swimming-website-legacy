@@ -1,0 +1,5 @@
+PATH='/local/bin:/usr/bin:/usr/X11R6/bin:/usr/sbin:/bin:/sbin'
+#GNU='/store/gnu/bin/'
+#ls="$GNU/ls"
+#mv="$GNU/mv"
+#chmod="$GNU/chmod"

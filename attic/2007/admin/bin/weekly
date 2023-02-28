@@ -1,0 +1,13 @@
+#!/bin/sh
+
+. /home/groups/svommer/public_html/admin/bin/Environment
+
+basedir=/home/groups/svommer/public_html/
+config=$basedir/admin/dbsettings.php
+dumpfile=$basedir/SQL/backup/weekly
+
+db_user=`/store/gnu/bin/sed -ne '/.*_user/s-^.*="\([a-z][a-z]*\)".*$-\1-p' $config`
+db_pw=`/store/gnu/bin/sed -ne '/.*_pw_query/s-^.*="\([^"][^"]*\)".*$-\1-p' $config`
+
+mysqldump --add-drop-table -u${db_user}_query -p$db_pw \
+           ${db_user}_member > $dumpfile

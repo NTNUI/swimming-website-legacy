@@ -1,0 +1,71 @@
+#!/bin/sh
+
+. /home/groups/svommer/public_html/admin/bin/Environment
+
+basedir=/home/groups/svommer/public_html/
+config=$basedir/admin/dbsettings.php
+outfile=$basedir/"NSF_nye_medlemmer"
+
+sed=/store/gnu/bin/sed
+
+db_user=`$sed -ne '/.*_user/s-^.*="\([a-z][a-z]*\)".*$-\1-p' $config`
+db_pw=`$sed -ne '/.*_pw_update/s-^.*="\([^"][^"]*\)".*$-\1-p' $config`
+
+select_NSF() {
+    typeset user="$1"
+    typeset pw="$2"
+
+    mysql -u${user}_update -p$pw -e -B --skip-column-names \
+        'select firstname,lastname,dateofbirth,address,zipcode
+         from PERSON
+         where credit >= 270     and 
+         dateofbirth is not null and
+         zipcode is not null     and
+         address is not null
+         order by lastname' ${user}_member
+}
+
+update_NSF() {
+    typeset user="$1"
+    typeset pw="$2"
+
+    mysql -u${user}_update -p$pw -e \
+        'insert into NSF (id,year)
+         select id,year(now()) from PERSON
+         where credit >= 270     and
+         dateofbirth is not null and
+         zipcode is not null     and
+         address is not null' ${db_user}_member
+
+    mysql -u${user}_update -p$pw -e \
+        'update PERSON
+         set credit = credit - 270
+         where credit >= 270     and
+         dateofbirth is not null and
+         zipcode is not null     and
+         address is not null' ${db_user}_member
+}
+
+if [ -z "$1" ]; then
+    select_NSF $db_user $db_pw;
+    echo "Databasen uendret."
+    echo "For uthenting av liste og oppdatering av database, gjør"
+    echo
+    echo "   $0 extract [utfil]"
+    echo
+    echo "Standardverdi for 'utfil' er $outfile"
+    echo
+elif [ x"$1" = "xextract" ]; then
+    if [ -n "$2" ]; then
+        outfile=$2
+    fi
+
+    select_NSF $db_user $db_pw > $outfile
+    update_NSF $db_user $db_pw
+else
+    echo "Ukjent kommando: $0 $@"
+    echo "Bruk:"
+    echo
+    echo "   $0 [extract [utfil]]"
+    echo
+fi

@@ -1,0 +1,36 @@
+#!/usr/bin/env/ perl -w
+# 
+
+use strict;
+use DBI;
+
+DBI->install_driver('mysql');
+
+my $driver = "mysql";
+my $user   = '<REDACTED>';
+my $auth   = '<REDACTED>';
+my $hostname ="<REDACTED>";
+my $database = "REDACTED";
+my $dsn = "DBI:$driver:database=$database;host=$hostname";
+
+my $dbh = DBI->connect($dsn, $user, $auth,
+                {printError => 1, RaiseError => 1, AutoCommit => 1});
+my $sth = $dbh->prepare( q{ insert into PERSON
+(firstname,lastname,dateofbirth,address,zipcode,phoneh,phonec,phonew,email,sex) values 
+(?,?,?,?,?,?,?,?,?,?) } )
+          || die $dbh->errstr;
+
+while (<>) {
+    chomp;
+    my ($firstname,$lastname,$dateofbirth,
+        $address,$zipcode,$phoneh,$phonec,$phonew,$email,$sex) 
+        = split /,/;
+    $sth->execute($firstname,$lastname,$dateofbirth,
+    $address,$zipcode,$phoneh,$phonec,$phonew,$email,$sex) || $dbh->errstr;
+}
+$dbh->commit || die $dbh->errstr;
+
+$sth->finish();
+$dbh->disconnect();
+
+print "Done!\n";

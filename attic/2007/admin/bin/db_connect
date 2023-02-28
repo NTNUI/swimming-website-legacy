@@ -1,0 +1,9 @@
+#!/bin/sh
+
+. /home/groups/svommer/public_html/admin/bin/Environment
+
+u='<REDACTED>'
+p='<REDACTED>'
+h='<REDACTED>'
+
+mysql -h${h} -u${u}_svommer -p${p} ${u}_member

@@ -1,0 +1,122 @@
+#!/store/bin/perl -w
+# 
+# Uthenting av medlemsliste fra databasen.
+
+use strict;
+use DBI;
+
+my $user = '<REDACTED>';
+my $pass = '<REDACTED>';
+my $db   = '<REDACTED>';
+my $host = '<REDACTED>';
+
+my $dsn = "DBI:mysql:database=$db;host=$host";
+
+my $dbh = DBI->connect($dsn, $user, $pass,
+                       { RaiseError => 1, AutoCommit => 1 });
+
+my $qry = qq{ SELECT   CONCAT(P.firstname, ' ', P.lastname) AS name,
+                       P.email AS email,
+                       P.dateofbirth AS dob
+              FROM     PERSON P,NSF
+              WHERE    P.id=NSF.id AND NSF.year=?
+              ORDER BY P.lastname,P.firstname };
+
+my $sth = $dbh->prepare($qry);
+$sth->execute(2002);
+
+open(OUT, ">medlemmer_2002.tex") or die "Could not open file: $!";
+
+print OUT <<'EOP';
+\documentclass[norsk,a4paper]{article}
+\usepackage[latin1]{inputenc}
+\usepackage{babel}
+\usepackage{longtable}
+\usepackage[margin=2.5cm]{geometry}
+\def\TwoDigits#1{\ifnum#1<10 0\fi\number#1}
+\def\ISOToday{\number\year--\TwoDigits\month--\TwoDigits\day}
+
+\author{{\texttt{MySQL}\texttrademark} \and \texttt{Perl} \and \texttt{DBI}}
+\date{\ISOToday}
+\title{Medlemsliste, Svømmegruppa NTNUI, år 2002}
+
+\begin{document}
+\maketitle
+
+\setlongtables
+\begin{longtable}{|l|c|l|}
+  \caption{Medlemmer} \\\hline
+  Medlem & Født & Epostadresse \\\hline
+  \endhead
+  \hline
+  \endfoot
+EOP
+
+my $href;
+
+while ($href = $sth->fetchrow_hashref) {
+    print OUT $href->{'name'}, " & ";
+
+    if (defined $href->{'dob'} and
+        $href->{'dob'} =~ /(\d{4})-(\d{2})-(\d{2})/) {
+        print OUT "$1--$2--$3 &";
+    }
+    else {
+        print OUT "Ikke registrert &";
+    }
+
+    print OUT ($href->{'email'} =~ /\w+@\w+/) ? 
+                "\\verb!$href->{'email'}!" : 
+                "Ikke registrert", "\\\\", "\n";
+}
+
+print OUT "\\end{longtable}\n\n";
+
+$qry = qq{ SELECT YEAR(P.dateofbirth) AS year,
+                  COUNT(*) AS number
+           FROM   PERSON P,NSF
+           WHERE  P.id=NSF.id AND NSF.year=?
+           GROUP BY year };
+$sth = $dbh->prepare($qry);
+$sth->execute(2002);
+
+print OUT << 'EOS';
+\begin{table}[htbp]
+\caption{Fødselsfordeling}
+\begin{center}
+\begin{tabular}{|l|r|}\hline
+År & Antall \\\hline
+EOS
+
+while ($href = $sth->fetchrow_hashref) {
+    if (defined $href->{'year'} and
+        $href->{'year'} =~ /\d{4}/) {
+        print OUT $href->{'year'}, " & ";
+    }
+    else {
+        print OUT "Uregistrert & ";
+    }
+
+    if (defined $href->{'number'} and
+        $href->{'number'} =~ /\d+/) {
+        print OUT $href->{'number'};
+    }
+    else {
+        print OUT "Uregistrert";
+    }
+
+    print OUT "\\\\\n";
+}
+
+print OUT << 'EOS';
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+\end{document}
+EOS
+
+$dbh->disconnect or warn "Unable to disconnect MySQL: $!";
+close(OUT) or warn "Unable to close LaTeX file\n";
+
+# vim:tw=72 sw=4 sm et si fo=croql

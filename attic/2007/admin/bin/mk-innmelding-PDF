@@ -1,0 +1,102 @@
+#!/store/bin/bash -norc
+# 
+# Lager PDF-utgave av navnelisten over de svømmerne som skal registreres
+# i NSF-databasen.
+#
+# Bruk:
+#       mk-innmelding [-o filnavn]
+#
+# Skrevet av:      Bård Skaflestad <bardsk@math.ntnu.no>
+# Første versjon:  2003-06-09
+# Sist endret:     2003-06-09, Bård Skaflestad <bardsk@math.ntnu.no>
+#
+# @(#)$Id:$
+
+. /home/groups/svommer/public_html/admin/bin/Environment
+
+MYSQL='mysql'
+AWK='/store/gnu/bin/awk'
+PDFLATEX='/store/bin/pdflatex'
+DATE='/store/gnu/bin/date'
+RM='/store/gnu/bin/rm'
+
+# Databaseoppsett
+user='<REDACTED>'
+dbhost='<REDACTED>'
+dbname="${user}_member"
+dbuser="${user}_svommer"
+dbpwrd='<REDACTED>'
+
+
+# Utskriftsfil
+ofile='NSF-innmelding.tex'
+if getopts "o:" oflag; then
+    ofile=${OPTARG%.*}.tex
+fi
+
+echo "Start: `$DATE '+%Y-%m-%d %T'`"
+echo -n "Henter innmeldingsopplysninger fra database..."
+{
+# Preamble til LaTeX-fil
+    cat <<- EOP
+	\documentclass[a4paper,12pt,norsk]{article}
+
+	\usepackage{babel,longtable,lscape}
+	\usepackage[latin1]{inputenc}
+	\usepackage[margin=2.5cm]{geometry}
+
+	\def\ToSiffer#1{\ifnum#1<10 0\fi\number#1}
+	\def\ISOidag{\number\year--\ToSiffer\month--\ToSiffer\day}
+
+	\begin{document}
+	\pagestyle{empty}
+	\setlongtables
+
+	\begin{landscape}
+	\begin{longtable}{|l|l|l|l|l|}
+	  \caption{Innmeldingsliste til NSF pr. \ISOidag} \\\\\hline
+	  Etternavn & Fornavn & Født & Adresse & Postnr \\\\\hline
+	  \endhead
+	  \hline
+	  \endfoot
+EOP
+
+# Medlemsliste:
+    # Etternavn, Fornavn, Fødselsdato, Adresse, Postnummer
+    # Ukjente verdier (NULL) erstattes med  'Ikke oppgitt'
+    $MYSQL --skip-column-names --host=$dbhost --user=$dbuser \
+           --password=$dbpwrd --batch --execute              \
+	   "SELECT   lastname, firstname,
+	   	     DATE_FORMAT(dateofbirth, '%d/%m %Y'),
+		     address, zipcode
+	    FROM     PERSON
+	    WHERE    credit > 0
+	    ORDER BY lastname,firstname" $dbname |
+    $AWK 'BEGIN { FS="\t"; OFS=" & "; ORS=" \\\\\n" } 
+	  { gsub(/NULL/, "\\textbf{Ikke oppgitt}") }
+      	  { print $1, $2, $3, $4, $5 }'
+
+# Avslutning av LaTeX-fil
+    cat <<- EOF
+	\end{longtable}
+	\end{landscape}
+	\end{document}
+EOF
+} > $ofile
+
+echo " Ferdig"
+echo -n "Typesetter LaTeX-dokument..."
+
+# Gjør typesetting, men ikke bry bruker med all verbositet fra TeX...
+if { $PDFLATEX $ofile && $PDFLATEX $ofile; } > /dev/null; then
+    echo " Ferdig:"
+    echo "	Innmeldingsliste i '${ofile%.tex}.pdf'"
+else
+    echo " Feil:"
+    echo "	Kunne ikke lage '${ofile%.tex}.pdf'"
+fi
+
+echo -n "Fjerner midlertidige filer..."
+$RM ${ofile%.tex}.{tex,log,aux}
+echo " Ferdig"
+echo "Slutt: `$DATE '+%Y-%m-%d %T'`"
